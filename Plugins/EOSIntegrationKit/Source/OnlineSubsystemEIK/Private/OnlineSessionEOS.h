@@ -1,11 +1,15 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
 #include "Misc/ScopeLock.h"
 #include "OnlineSessionSettings.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#if ENGINE_MAJOR_VERSION >= 5
 #include "Online/LANBeacon.h"
+#else
+#include "LANBeacon.h"
+#endif
 #include "OnlineSubsystemEOSTypes.h"
 #include "OnlineSubsystemEIK/Subsystem/EIK_Subsystem.h"
 
@@ -53,9 +57,14 @@ struct FLobbyDetailsEOS : FNoncopyable
 /**
  * Interface for interacting with EOS sessions
  */
+#if ENGINE_MAJOR_VERSION >= 5
 class FOnlineSessionEOS
 	: public IOnlineSession
 	, public TSharedFromThis<FOnlineSessionEOS, ESPMode::ThreadSafe>
+#else
+class FOnlineSessionEOS :
+	public IOnlineSession
+#endif
 {
 public:
 	FOnlineSessionEOS() = delete;
@@ -142,6 +151,7 @@ public:
 	virtual bool SendSessionInviteToFriend(const FUniqueNetId& LocalUserId, FName SessionName, const FUniqueNetId& Friend) override;
 	virtual bool SendSessionInviteToFriends(int32 LocalUserNum, FName SessionName, const TArray< FUniqueNetIdRef >& Friends) override;
 	virtual bool SendSessionInviteToFriends(const FUniqueNetId& LocalUserId, FName SessionName, const TArray< FUniqueNetIdRef >& Friends) override;
+	bool GetConnectStringFromSessionInfoForBeacon(TSharedPtr<FOnlineSessionInfoEOS>& SessionInfo, FString& ConnectInfo, int32 PortOverride = 0);
 	virtual bool GetResolvedConnectString(FName SessionName, FString& ConnectInfo, FName PortType) override;
 	virtual bool GetResolvedConnectString(const FOnlineSessionSearchResult& SearchResult, FName PortType, FString& ConnectInfo) override;
 	virtual FOnlineSessionSettings* GetSessionSettings(FName SessionName) override;
@@ -203,10 +213,13 @@ public:
 
 	void Init(const FString& InBucketId);
 
+	EOS_HLobby LobbyHandle;
+	void OnLobbyInviteAccepted(const char* InviteId, const EOS_ProductUserId& LocalUserId, const EOS_ProductUserId& TargetUserId);
+
 private:
 	// EOS Lobbies
 
-	EOS_HLobby LobbyHandle;
+
 	TArray<TSharedRef<FLobbyDetailsEOS>> PendingLobbySearchResults;
 	TMap<FString, TSharedRef<FLobbyDetailsEOS>> LobbySearchResultsCache;
 
@@ -239,13 +252,17 @@ private:
 	FCallbackBase* LobbyInviteAcceptedCallback;
 	EOS_NotificationId JoinLobbyAcceptedId;
 	FCallbackBase* JoinLobbyAcceptedCallback;
+	EOS_NotificationId LeaveLobbyRequestId;
+	FCallbackBase* LeaveLobbyRequestCallback;
 
 	void OnLobbyUpdateReceived(const EOS_LobbyId& LobbyId);
 	void OnLobbyMemberUpdateReceived(const EOS_LobbyId& LobbyId, const EOS_ProductUserId& TargetUserId);
 	void OnMemberStatusReceived(const EOS_LobbyId& LobbyId, const EOS_ProductUserId& TargetUserId, EOS_ELobbyMemberStatus CurrentStatus);
-	void OnLobbyInviteAccepted(const char* InviteId, const EOS_ProductUserId& LocalUserId, const EOS_ProductUserId& TargetUserId);
 	void OnJoinLobbyAccepted(const EOS_ProductUserId& LocalUserId, const EOS_UI_EventId& UiEventId);
-
+#if PLATFORM_WINDOWS
+	void OnLeaveLobbyRequested(const EOS_ProductUserId& LocalUserId, const EOS_Lobby_LeaveLobbyRequestedCallbackInfo* Data);
+#endif
+	
 	// Methods to update an API Lobby from an OSS Lobby
 	void SetLobbyPermissionLevel(EOS_HLobbyModification LobbyModificationHandle, FNamedOnlineSession* Session);
 	void SetLobbyMaxMembers(EOS_HLobbyModification LobbyModificationHandle, FNamedOnlineSession* Session);
@@ -303,7 +320,11 @@ private:
 	void SetJoinInProgress(EOS_HSessionModification SessionModHandle, FNamedOnlineSession* Session);
 	void AddAttribute(EOS_HSessionModification SessionModHandle, const EOS_Sessions_AttributeData* Attribute);
 	void SetAttributes(EOS_HSessionModification SessionModHandle, FNamedOnlineSession* Session);
+#if ENGINE_MAJOR_VERSION == 5
 	typedef TEOSCallback<EOS_Sessions_OnUpdateSessionCallback, EOS_Sessions_UpdateSessionCallbackInfo, FOnlineSessionEOS> FUpdateSessionCallback;
+#else
+	typedef TEOSCallback<EOS_Sessions_OnUpdateSessionCallback, EOS_Sessions_UpdateSessionCallbackInfo> FUpdateSessionCallback;
+#endif
 	uint32 SharedSessionUpdate(EOS_HSessionModification SessionModHandle, FNamedOnlineSession* Session, FUpdateSessionCallback* Callback);
 
 	void TickLanTasks(float DeltaTime);

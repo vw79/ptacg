@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "OnlineTitleFileEOS.h"
 #include "OnlineSubsystem.h"
@@ -11,6 +11,7 @@
 #if WITH_EOS_SDK
 #include "eos_titlestorage.h"
 
+#if ENGINE_MAJOR_VERSION == 5
 typedef TEOSCallback<EOS_TitleStorage_OnDeleteCacheCompleteCallback, EOS_TitleStorage_DeleteCacheCallbackInfo, FOnlineTitleFileEOS> FDeleteCacheCompleteCallback;
 
 typedef TEOSCallback<EOS_TitleStorage_OnQueryFileListCompleteCallback, EOS_TitleStorage_QueryFileListCallbackInfo, FOnlineTitleFileEOS> FQueryFileListCallback;
@@ -19,6 +20,15 @@ typedef TEOSCallbackWithNested2<EOS_TitleStorage_OnReadFileCompleteCallback, EOS
 	EOS_TitleStorage_OnReadFileDataCallback, EOS_TitleStorage_ReadFileDataCallbackInfo, EOS_TitleStorage_EReadResult,
 	EOS_TitleStorage_OnFileTransferProgressCallback, EOS_TitleStorage_FileTransferProgressCallbackInfo
 > FReadTitleFileCompleteCallback;
+#else
+typedef TEOSCallback<EOS_TitleStorage_OnDeleteCacheCompleteCallback, EOS_TitleStorage_DeleteCacheCallbackInfo> FDeleteCacheCompleteCallback;
+
+typedef TEOSCallback<EOS_TitleStorage_OnQueryFileListCompleteCallback, EOS_TitleStorage_QueryFileListCallbackInfo> FQueryFileListCallback;
+
+typedef TEOSCallbackWithNested2<EOS_TitleStorage_OnReadFileCompleteCallback, EOS_TitleStorage_ReadFileCallbackInfo,
+	EOS_TitleStorage_OnReadFileDataCallback, EOS_TitleStorage_ReadFileDataCallbackInfo, EOS_TitleStorage_EReadResult,
+	EOS_TitleStorage_OnFileTransferProgressCallback, EOS_TitleStorage_FileTransferProgressCallbackInfo> FReadTitleFileCompleteCallback;
+#endif
 
 void FEOSTitleFile::Unload()
 {
@@ -98,7 +108,11 @@ void FOnlineTitleFileEOS::DeleteCachedFiles(bool bSkipEnumerated)
 	DeleteCacheOptions.ApiVersion = EOS_TITLESTORAGE_DELETECACHEOPTIONS_API_LATEST;
 	DeleteCacheOptions.LocalUserId = EOSSubsystem->UserManager->GetLocalProductUserId();	// Get a local user if one is available, but this is not required
 
+#if ENGINE_MAJOR_VERSION == 5
 	FDeleteCacheCompleteCallback* CallbackObj = new FDeleteCacheCompleteCallback(FOnlineTitleFileEOSWeakPtr(AsShared()));
+#else
+	FDeleteCacheCompleteCallback* CallbackObj = new FDeleteCacheCompleteCallback();
+#endif
 	CallbackObj->CallbackLambda = [this](const EOS_TitleStorage_DeleteCacheCallbackInfo* Data)
 	{
 		bool bWasSuccessful = Data->ResultCode == EOS_EResult::EOS_Success;
@@ -169,7 +183,11 @@ bool FOnlineTitleFileEOS::EnumerateFiles(const FPagedQuery& Page)
 	QueryFileListOptions.ListOfTags = const_cast<const char**>(AnsiTags.GetData());
 	QueryFileListOptions.ListOfTagsCount = AnsiTags.Num();
 
+#if ENGINE_MAJOR_VERSION == 5
 	FQueryFileListCallback* CallbackObj = new FQueryFileListCallback(FOnlineTitleFileEOSWeakPtr(AsShared()));
+#else
+	FQueryFileListCallback* CallbackObj = new FQueryFileListCallback();
+#endif
 	CallbackObj->CallbackLambda = [this](const EOS_TitleStorage_QueryFileListCallbackInfo* Data)
 	{
 		FString ErrorStr;
@@ -241,8 +259,12 @@ bool FOnlineTitleFileEOS::ReadFile(const FString& FileName)
 		return true;
 	}
 
+#if ENGINE_MAJOR_VERSION == 5
 	FReadTitleFileCompleteCallback* CallbackObj = new FReadTitleFileCompleteCallback(FOnlineTitleFileEOSWeakPtr(AsShared()));
-
+#else
+	FReadTitleFileCompleteCallback* CallbackObj = new FReadTitleFileCompleteCallback();
+#endif
+	
 	CallbackObj->SetNested1CallbackLambda([this](const EOS_TitleStorage_ReadFileDataCallbackInfo* Data)
 	{
 		UE_LOG_ONLINE_TITLEFILE(VeryVerbose, TEXT("Read file data (%s) %d bytes"), ANSI_TO_TCHAR(Data->Filename), Data->DataChunkLengthBytes);
@@ -288,8 +310,12 @@ bool FOnlineTitleFileEOS::ReadFile(const FString& FileName)
 
 	CallbackObj->SetNested2CallbackLambda([this](const EOS_TitleStorage_FileTransferProgressCallbackInfo* Data)
 	{
-		UE_LOG_ONLINE_TITLEFILE(VeryVerbose, TEXT("File transfer progress (%s) %d bytes"), ANSI_TO_TCHAR(Data->Filename), Data->BytesTransferred);
-		TriggerOnReadFileProgressDelegates(FString(ANSI_TO_TCHAR(Data->Filename)), Data->BytesTransferred);
+		float Megabytesdone = Data->BytesTransferred / (1024.0f * 1024.0f);
+		float MegabytesTotal = Data->TotalFileSizeBytes / (1024.0f * 1024.0f);
+		float FPercentagedone = (Megabytesdone / MegabytesTotal);
+		uint64 percentagedone = (uint64)(FPercentagedone * 100.0f);
+		UE_LOG_ONLINE_TITLEFILE(VeryVerbose, TEXT("File transfer progress (%s) %llu bytes"), ANSI_TO_TCHAR(Data->Filename), percentagedone);
+		TriggerOnReadFileProgressDelegates(FString(ANSI_TO_TCHAR(Data->Filename)), percentagedone);
 	});
 
 	CallbackObj->CallbackLambda = [this](const EOS_TitleStorage_ReadFileCallbackInfo* Data)

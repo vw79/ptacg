@@ -1,8 +1,9 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_GetStats_AsyncFunction.h"
 
+#include "OnlineError.h"
 #include "OnlineStatsEOS.h"
 #include "OnlineSubsystemEIK/Subsystem/EIK_Subsystem.h"
 
@@ -21,7 +22,7 @@ void UEIK_GetStats_AsyncFunction::Activate()
 
 void UEIK_GetStats_AsyncFunction::GetStats()
 {
-	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get("EIK"))
 	{
 		if(const IOnlineIdentityPtr IdentityPointerRef = SubsystemRef->GetIdentityInterface())
 		{
@@ -35,6 +36,11 @@ void UEIK_GetStats_AsyncFunction::GetStats()
 						OnFail.Broadcast(TArray<FEIK_Stats>());
 						bDelegateCalled = true;
 						SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+						MarkAsGarbage();
+#else
+						MarkPendingKill();
+#endif
 					}
 				}
 				Usersvar.Add(IdentityPointerRef->GetUniquePlayerId(0).ToSharedRef());
@@ -47,6 +53,11 @@ void UEIK_GetStats_AsyncFunction::GetStats()
 					OnFail.Broadcast(TArray<FEIK_Stats>());
 					bDelegateCalled = true;
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -57,6 +68,11 @@ void UEIK_GetStats_AsyncFunction::GetStats()
 				OnFail.Broadcast(TArray<FEIK_Stats>());
 				bDelegateCalled = true;
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -67,6 +83,11 @@ void UEIK_GetStats_AsyncFunction::GetStats()
 			OnFail.Broadcast(TArray<FEIK_Stats>());
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }
@@ -95,6 +116,11 @@ void UEIK_GetStats_AsyncFunction::OnGetStatsCompleted(const FOnlineError& Result
 			OnSuccess.Broadcast(LocalStatsArray);
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 	else
@@ -104,6 +130,11 @@ void UEIK_GetStats_AsyncFunction::OnGetStatsCompleted(const FOnlineError& Result
 			OnFail.Broadcast(TArray<FEIK_Stats>());
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }

@@ -1,9 +1,10 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "IpNetDriver.h"
+#include "OnlineBeacon.h"
 #include "NetDriverEIKBase.generated.h"
 
 class ISocketSubsystem;
@@ -23,6 +24,7 @@ public:
 	virtual ISocketSubsystem* GetSocketSubsystem() override;
 	virtual void Shutdown() override;
 	virtual int GetClientPort() override;
+	bool IsBeaconDriver() const;
 //~ End UNetDriver Interface
 
 	UWorld* FindWorld() const;

@@ -1,10 +1,14 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#if ENGINE_MAJOR_VERSION == 5
 #include "Online/CoreOnline.h"
+#else
+#include "UObject/CoreOnline.h"
+#endif
 #include "Kismet/BlueprintAsyncActionBase.h"
 #include "EIK_SetPlayerData_AsyncFunction.generated.h"
 

@@ -1,6 +1,8 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "EOSVoiceChat.h" 
+
+#include "EIKSettings.h"
 
 #if WITH_EOS_RTC
 
@@ -95,8 +97,12 @@ void FEOSVoiceChat::Initialize(const FOnVoiceChatInitializeCompleteDelegate& Ini
 	{
 	case EInitializationState::Uninitialized:
 	{
+		const UEIKSettings* EIKSettings = GetMutableDefault<UEIKSettings>();
 		bool bEnabled = true;
-		GConfig->GetBool(TEXT("EOSVoiceChat"), TEXT("bEnabled"), bEnabled, GEngineIni);
+		if(!EIKSettings || EIKSettings->VoiceArtifactName.IsEmpty())
+		{
+			bEnabled = false;
+		}
 		if (bEnabled)
 		{
 			InitSession.State = EInitializationState::Initializing;
@@ -114,16 +120,29 @@ void FEOSVoiceChat::Initialize(const FOnVoiceChatInitializeCompleteDelegate& Ini
 					FString ConfigEncryptionKey;
 					FString ConfigOverrideCountryCode;
 					FString ConfigOverrideLocaleCode;
-
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ProductId"), ConfigProductId, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("SandboxId"), ConfigSandboxId, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("DeploymentId"), ConfigDeploymentId, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientId"), ConfigClientId, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientSecret"), ConfigClientSecret, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientEncryptionKey"), ConfigEncryptionKey, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("OverrideCountryCode"), ConfigOverrideCountryCode, GEngineIni);
-					GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("OverrideLocaleCode"), ConfigOverrideLocaleCode, GEngineIni);
-
+					
+					FEOSArtifactSettings VoiceArtifactSettings;
+					EIKSettings->GetSettingsForArtifact(EIKSettings->VoiceArtifactName, VoiceArtifactSettings);
+					ConfigProductId = VoiceArtifactSettings.ProductId;
+					ConfigSandboxId = VoiceArtifactSettings.SandboxId;
+					ConfigDeploymentId = VoiceArtifactSettings.DeploymentId;
+					ConfigClientId = VoiceArtifactSettings.ClientId;
+					ConfigClientSecret = VoiceArtifactSettings.ClientSecret;
+					ConfigEncryptionKey = VoiceArtifactSettings.EncryptionKey;
+					
+					if(ConfigProductId.IsEmpty() || ConfigSandboxId.IsEmpty() || ConfigDeploymentId.IsEmpty() || ConfigClientId.IsEmpty() || ConfigClientSecret.IsEmpty() || ConfigEncryptionKey.IsEmpty())
+					{
+						UE_LOG(LogEOSVoiceChat, Warning, TEXT("FEOSVoiceChat::Initialize ProductID, SandboxID, DeploymentID, ClientID, ClientSecret, EncryptionKey are empty. Using EOSVoiceChat section in Engine.ini"));
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ProductId"), ConfigProductId, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("SandboxId"), ConfigSandboxId, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("DeploymentId"), ConfigDeploymentId, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientId"), ConfigClientId, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientSecret"), ConfigClientSecret, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientEncryptionKey"), ConfigEncryptionKey, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("OverrideCountryCode"), ConfigOverrideCountryCode, GEngineIni);
+						GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("OverrideLocaleCode"), ConfigOverrideLocaleCode, GEngineIni);
+						
+					}
 					const FTCHARToUTF8 Utf8ProductId(*ConfigProductId);
 					const FTCHARToUTF8 Utf8SandboxId(*ConfigSandboxId);
 					const FTCHARToUTF8 Utf8DeploymentId(*ConfigDeploymentId);
@@ -291,6 +310,13 @@ IVoiceChatUser* FEOSVoiceChat::CreateUser()
 	return &User.Get();
 }
 
+#if ENGINE_MAJOR_VERSION != 5
+FEOSVoiceChatWeakPtr FEOSVoiceChat::CreateWeakThis()
+{
+	return FEOSVoiceChatWeakPtr(AsShared());
+}
+#endif
+
 void FEOSVoiceChat::ReleaseUser(IVoiceChatUser* User)
 {
 	if (User)
@@ -300,7 +326,11 @@ void FEOSVoiceChat::ReleaseUser(IVoiceChatUser* User)
 			&& User->IsLoggedIn())
 		{
 			UE_LOG(LogEOSVoiceChat, Log, TEXT("ReleaseUser User=[%p] Logging out"), User);
+#if ENGINE_MAJOR_VERSION == 5
 			User->Logout(FOnVoiceChatLogoutCompleteDelegate::CreateLambda([this, WeakThis = AsWeak(), User](const FString& PlayerName, const FVoiceChatResult& Result)
+#else
+			User->Logout(FOnVoiceChatLogoutCompleteDelegate::CreateLambda([this, WeakThis = CreateWeakThis(), User](const FString& PlayerName, const FVoiceChatResult& Result)
+#endif
 			{
 				CHECKPIN();
 
@@ -381,7 +411,7 @@ bool FEOSVoiceChat::GetAudioOutputDeviceMuted() const
 
 TArray<FVoiceChatDeviceInfo> FEOSVoiceChat::GetAvailableInputDeviceInfos() const
 {
-	return GetVoiceChatUser().GetAvailableOutputDeviceInfos();
+	return GetVoiceChatUser().GetAvailableInputDeviceInfos();
 }
 
 TArray<FVoiceChatDeviceInfo> FEOSVoiceChat::GetAvailableOutputDeviceInfos() const
@@ -713,7 +743,8 @@ TSet<FString> FEOSVoiceChat::GetTransmitChannels() const
 	return GetVoiceChatUser().GetTransmitChannels();
 }
 
-#elif ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >=1
+#else
+
 void FEOSVoiceChat::TransmitToSpecificChannel(const FString& ChannelName)
 {
 	GetVoiceChatUser().TransmitToSpecificChannel(ChannelName);
@@ -836,7 +867,11 @@ void FEOSVoiceChat::OnAudioDevicesChangedStatic(const EOS_RTCAudio_AudioDevicesC
 
 void FEOSVoiceChat::OnAudioDevicesChanged()
 {
+#if ENGINE_MAJOR_VERSION == 5
 	InitSession.EosAudioDevicePool->RefreshAudioDevices(FEOSAudioDevicePool::FOnAudioDevicePoolRefreshAudioDevicesCompleteDelegate::CreateLambda([WeakThis = AsWeak()](const FVoiceChatResult& Result) -> void
+#else
+	InitSession.EosAudioDevicePool->RefreshAudioDevices(FEOSAudioDevicePool::FOnAudioDevicePoolRefreshAudioDevicesCompleteDelegate::CreateLambda([WeakThis = CreateWeakThis()](const FVoiceChatResult& Result) -> void
+#endif
 	{
 		CHECKPIN();
 

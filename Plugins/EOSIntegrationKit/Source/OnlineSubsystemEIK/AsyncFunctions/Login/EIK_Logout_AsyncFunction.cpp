@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_Logout_AsyncFunction.h"
@@ -31,12 +31,22 @@ void UEIK_Logout_AsyncFunction::LogoutPlayer()
 		{
 			OnFail.Broadcast();
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 	else
 	{
 		OnFail.Broadcast();
 		SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+		MarkAsGarbage();
+#else
+		MarkPendingKill();
+#endif
 	}
 }
 
@@ -46,12 +56,22 @@ void UEIK_Logout_AsyncFunction::LogoutCallback(int32 LocalUserNum, bool bWasSucc
 	{
 		OnSuccess.Broadcast();
 		SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+		MarkAsGarbage();
+#else
+		MarkPendingKill();
+#endif
 		return;
 	}
 	else
 	{
 		OnFail.Broadcast();
 		SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+		MarkAsGarbage();
+#else
+		MarkPendingKill();
+#endif
 		return;
 	}
 }

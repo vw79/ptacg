@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright (c) 2023 Betide Studio. All Rights Reserved.
 
 
 #include "EIK_EngineSubsystem.h"
@@ -7,6 +7,10 @@
 #include "OnlineSubsystemModule.h"
 #include "OnlineSubsystem.h"
 #include "Interfaces/OnlineIdentityInterface.h"
+
+#if WITH_EDITOR
+	#include "Editor.h"
+#endif
 
 void UEIK_EngineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {

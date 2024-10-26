@@ -1,6 +1,9 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "NetDriverEIKBase.h"
+#include "OnlineBeaconHost.h"
+#include "OnlineBeaconClient.h"
+#include "EngineUtils.h"
 #include "NetConnectionEIK.h"
 #include "SocketEIK.h"
 #include "SocketSubsystemEIK.h"
@@ -8,7 +11,9 @@
 #include "EOSSharedTypes.h"
 #include "Engine/Engine.h"
 
+#if ENGINE_MAJOR_VERSION >= 5
 #include UE_INLINE_GENERATED_CPP_BY_NAME(NetDriverEIKBase)
+#endif
 
 bool UNetDriverEIKBase::IsAvailable() const
 {
@@ -33,7 +38,6 @@ bool UNetDriverEIKBase::InitBase(bool bInitAsClient, FNetworkNotify* InNotify, c
 		UE_LOG(LogTemp, Verbose, TEXT("Running as pass-through"));
 		return Super::InitBase(bInitAsClient, InNotify, URL, bReuseAddressAndPort, Error);
 	}
-
 	if (!UNetDriver::InitBase(bInitAsClient, InNotify, URL, bReuseAddressAndPort, Error))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to init driver base"));
@@ -43,6 +47,10 @@ bool UNetDriverEIKBase::InitBase(bool bInitAsClient, FNetworkNotify* InNotify, c
 	FSocketSubsystemEIK* const SocketSubsystem = static_cast<FSocketSubsystemEIK*>(GetSocketSubsystem());
 	if (!SocketSubsystem)
 	{
+		if(!GetSocketSubsystem())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Could not get socket subsystem that is the base of EOS"));
+		}
 		UE_LOG(LogTemp, Warning, TEXT("Could not get socket subsystem"));
 		return false;
 	}
@@ -74,10 +82,20 @@ bool UNetDriverEIKBase::InitBase(bool bInitAsClient, FNetworkNotify* InNotify, c
 
 	// Store our local address and set our port
 	TSharedRef<FInternetAddrEOS> EOSLocalAddress = StaticCastSharedRef<FInternetAddrEOS>(LocalAddress);
-	// Because some platforms remap ports, we will use the ID of the name of the net driver to be our channel
-	EOSLocalAddress->SetChannel(GetTypeHash(NetDriverName.ToString()));
-	// Set our net driver name so we don't accept connections across net driver types
-	EOSLocalAddress->SetSocketName(NetDriverName.ToString());
+	if(IsBeaconDriver())
+	{
+		//Till we have a better solution, we will use a hardcoded port for the beacon driver
+		EOSLocalAddress->SetSocketName(TEXT("BeaconSession"));
+		// We will also use a hardcoded channel for the beacon driver
+		EOSLocalAddress->SetChannel(71);
+	}
+	else
+	{
+		// Because some platforms remap ports, we will use the ID of the name of the net driver to be our channel
+		EOSLocalAddress->SetChannel(GetTypeHash(NetDriverName.ToString()));
+		// Set our net driver name so we don't accept connections across net driver types
+		EOSLocalAddress->SetSocketName(NetDriverName.ToString());
+	}
 
 	static_cast<FSocketEOS*>(GetSocket())->SetLocalAddress(*EOSLocalAddress);
 
@@ -145,7 +163,7 @@ bool UNetDriverEIKBase::InitConnect(FNetworkNotify* InNotify, const FURL& Connec
 
 bool UNetDriverEIKBase::InitListen(FNetworkNotify* InNotify, FURL& LocalURL, bool bReuseAddressAndPort, FString& Error)
 {
-	
+	UE_LOG(LogTemp, Verbose, TEXT("InitListen with LocalURL = (%s)"), *LocalURL.ToString());
 	if (!bIsUsingP2PSockets || !IsAvailable() || LocalURL.HasOption(TEXT("bIsLanMatch")) || LocalURL.HasOption(TEXT("bUseIPSockets")))
 	{
 		UE_LOG(LogTemp, Verbose, TEXT("Init as IPNetDriver listen server. LocalURL = (%s)"), *LocalURL.ToString());
@@ -173,6 +191,44 @@ bool UNetDriverEIKBase::InitListen(FNetworkNotify* InNotify, FURL& LocalURL, boo
 	InitConnectionlessHandler();
 
 	UE_LOG(LogTemp, Verbose, TEXT("Initialized as an EOSP2P listen server"));
+
+	// Ensure we have a valid world context
+	UWorld* TWorld = FindWorld();
+	if (!TWorld)
+	{
+		Error = TEXT("Invalid world context");
+		return false;
+	}
+	
+	// Check if a Beacon Host already exists
+	bool bBeaconHostExists = false;
+    for (TActorIterator<AOnlineBeaconHost> It(TWorld); It; ++It)
+	{
+		if (*It)
+		{
+			bBeaconHostExists = true;
+			break;
+		}
+	}
+
+	/* Initialize Beacon Host if it doesn't already exist
+	if (!bBeaconHostExists)
+	{
+        AOnlineBeaconHost* BeaconHost = TWorld->SpawnActor<AOnlineBeaconHost>();
+		if (BeaconHost)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Spawned Beacon Host"));
+			BeaconHost->SetNetDriverName(NAME_BeaconNetDriver);
+			BeaconHost->InitHost();
+			BeaconHost->PauseBeaconRequests(false);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to spawn Beacon Host"));
+		}
+	}
+	*/
+
 	return true;
 }
 
@@ -182,32 +238,33 @@ ISocketSubsystem* UNetDriverEIKBase::GetSocketSubsystem()
 	{
 		return ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
 	}
-	else
-	{
-		UWorld* CurrentWorld = FindWorld();
-		FSocketSubsystemEIK* DefaultSocketSubsystem = static_cast<FSocketSubsystemEIK*>(ISocketSubsystem::Get(EOS_SOCKETSUBSYSTEM));
-		return DefaultSocketSubsystem->GetSocketSubsystemForWorld(CurrentWorld);
-	}
+	UWorld* CurrentWorld = FindWorld();
+	FSocketSubsystemEIK* DefaultSocketSubsystem = static_cast<FSocketSubsystemEIK*>(ISocketSubsystem::Get(EOS_SOCKETSUBSYSTEM));
+	return DefaultSocketSubsystem->GetSocketSubsystemForWorld(CurrentWorld);
 }
 
 void UNetDriverEIKBase::Shutdown()
 {
-	UE_LOG(LogTemp, Verbose, TEXT("Shutting down NetDriver"));
-
 	Super::Shutdown();
 
 	// Kill our P2P sessions now, instead of when garbage collection kicks in later
 	if (!bIsPassthrough)
 	{
-		if (UNetConnectionEIK* const EOSServerConnection = Cast<UNetConnectionEIK>(ServerConnection))
+		if(ServerConnection)
 		{
-			EOSServerConnection->DestroyEOSConnection();
+			if (UNetConnectionEIK* const EOSServerConnection = Cast<UNetConnectionEIK>(ServerConnection))
+			{
+				EOSServerConnection->DestroyEOSConnection();
+			}
 		}
 		for (UNetConnection* Client : ClientConnections)
 		{
-			if (UNetConnectionEIK* const EOSClient = Cast<UNetConnectionEIK>(Client))
+			if(Client)
 			{
-				EOSClient->DestroyEOSConnection();
+				if (UNetConnectionEIK* const EOSClient = Cast<UNetConnectionEIK>(Client))
+				{
+					EOSClient->DestroyEOSConnection();
+				}
 			}
 		}
 	}
@@ -224,16 +281,59 @@ int UNetDriverEIKBase::GetClientPort()
 	return 49152;
 }
 
+bool UNetDriverEIKBase::IsBeaconDriver() const
+{
+	if (!GEngine) return false;
+
+	for (const auto &WorldContext : GEngine->GetWorldContexts())
+	{
+		if (UWorld *ItWorld = WorldContext.World())
+		{
+			for (AOnlineBeacon* Beacon : TActorRange<AOnlineBeacon>(ItWorld))
+			{
+				if (Beacon->GetNetDriver() == this)
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+	
+
 UWorld* UNetDriverEIKBase::FindWorld() const
 {
 	UWorld* MyWorld = GetWorld();
-
+	
 	// If we don't have a world, we may be a pending net driver
 	if (!MyWorld && GEngine)
 	{
 		if (FWorldContext* WorldContext = GEngine->GetWorldContextFromPendingNetGameNetDriver(this))
 		{
 			MyWorld = WorldContext->World();
+		}
+	}
+
+	if(!MyWorld)
+	{
+		if (GEngine != nullptr)
+		{
+			for (const auto &WorldContext : GEngine->GetWorldContexts())
+			{
+				UWorld *ItWorld = WorldContext.World();
+				if (ItWorld != nullptr)
+				{
+					for (TActorIterator<AOnlineBeacon> It(ItWorld); It; ++It)
+					{
+						if (It->GetNetDriver() == this)
+						{
+							return ItWorld;
+						}
+					}
+				}
+			}
 		}
 	}
 

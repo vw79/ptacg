@@ -10,18 +10,31 @@ public class EOSIntegrationKit : ModuleRules
 			new string[]
 			{
 				"Core",
+				"OnlineSubsystemUtils",
 			}
 		);
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"Core",
 				"CoreUObject",
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"SocketSubsystemEIK",
-				"OnlineSubsystemEIK"
+				"Projects",
+				"OnlineSubsystem",
+				"Slate",
+				"SlateCore",
 			}
 		);
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(
+				new string[] {
+					"UnrealEd",
+					"ToolMenus",
+				}
+			);
+		}
 	}
 }

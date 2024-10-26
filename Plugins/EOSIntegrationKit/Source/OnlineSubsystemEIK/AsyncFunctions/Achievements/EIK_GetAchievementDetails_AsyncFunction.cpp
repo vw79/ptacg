@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_GetAchievementDetails_AsyncFunction.h"
@@ -22,7 +22,7 @@ void UEIK_GetAchievementDetails_AsyncFunction::Activate()
 
 void UEIK_GetAchievementDetails_AsyncFunction::GetAchievementDescription()
 {
-	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get("EIK"))
 	{
 		if(const IOnlineAchievementsPtr AchievementsPtrRef = SubsystemRef->GetAchievementsInterface())
 		{
@@ -37,6 +37,11 @@ void UEIK_GetAchievementDetails_AsyncFunction::GetAchievementDescription()
 					OnFail.Broadcast(FEIK_AchievementDescription());
 					bDelegateCalled = true;
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -47,6 +52,11 @@ void UEIK_GetAchievementDetails_AsyncFunction::GetAchievementDescription()
 				OnFail.Broadcast(FEIK_AchievementDescription());
 				bDelegateCalled = true;
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -57,6 +67,11 @@ void UEIK_GetAchievementDetails_AsyncFunction::GetAchievementDescription()
 			OnFail.Broadcast(FEIK_AchievementDescription());
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }
@@ -64,7 +79,7 @@ void UEIK_GetAchievementDetails_AsyncFunction::OnAchievementDescriptionCompleted
 {
 	if(bWasSuccess)
 	{
-		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get("EIK"))
 		{
 			if(const IOnlineAchievementsPtr AchievementsPtrRef = SubsystemRef->GetAchievementsInterface())
 			{
@@ -80,6 +95,11 @@ void UEIK_GetAchievementDetails_AsyncFunction::OnAchievementDescriptionCompleted
 				LocalAchievementDescription.UnlockTime = CachedAchievements.UnlockTime;
 				OnSuccess.Broadcast(LocalAchievementDescription);
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 				return;
 			}
 		}
@@ -89,5 +109,10 @@ void UEIK_GetAchievementDetails_AsyncFunction::OnAchievementDescriptionCompleted
 		OnFail.Broadcast(FEIK_AchievementDescription());
 		bDelegateCalled = true;
 		SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+		MarkAsGarbage();
+#else
+		MarkPendingKill();
+#endif
 	}
 }

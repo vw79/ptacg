@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -50,13 +50,4 @@ private:
 	void RegisterMenus();
 
 	void ConfigureOnlineSubsystemEIK();
-
-	TSharedPtr<class FUICommandList> PluginCommands;
-
-
-
-
-
-private:
-	//TSharedPtr<class FUICommandList> PluginCommands;
 };

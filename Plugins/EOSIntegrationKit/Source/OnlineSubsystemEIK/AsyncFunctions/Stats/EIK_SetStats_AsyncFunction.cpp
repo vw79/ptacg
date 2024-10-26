@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_SetStats_AsyncFunction.h"
@@ -24,6 +24,11 @@ void UEIK_SetStats_AsyncFunction::OnEUpdateStatsCompleted(const FOnlineError& Re
 			OnSuccess.Broadcast();
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 	else
@@ -33,6 +38,11 @@ void UEIK_SetStats_AsyncFunction::OnEUpdateStatsCompleted(const FOnlineError& Re
 			OnFail.Broadcast();
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 	return;
@@ -65,6 +75,11 @@ void UEIK_SetStats_AsyncFunction::SetEIKStatsLocal()
 					OnFail.Broadcast();
 					bDelegateCalled = true;
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -75,6 +90,11 @@ void UEIK_SetStats_AsyncFunction::SetEIKStatsLocal()
 				OnFail.Broadcast();
 				bDelegateCalled = true;
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -85,6 +105,11 @@ void UEIK_SetStats_AsyncFunction::SetEIKStatsLocal()
 			OnFail.Broadcast();
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }

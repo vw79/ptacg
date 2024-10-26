@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -31,6 +31,7 @@ class ONLINESUBSYSTEMEIK_API UEIK_JoinSession_AsyncFunction : public UBlueprintA
 public:
 
 	bool bDelegateCalled = false;
+	FName Var_SessionName;
 	
 	UPROPERTY(BlueprintAssignable, DisplayName="Success")
 	FJoinSession_Delegate OnSuccess;
@@ -44,15 +45,18 @@ public:
 	For Input Parameters, please refer to the documentation link above.
 	*/
 	UFUNCTION(BlueprintCallable, DisplayName="Join EIK Session",meta = (BlueprintInternalUseOnly = "true",  WorldContext = "WorldContextObject"), Category="EOS Integration Kit || Sessions")
-	static UEIK_JoinSession_AsyncFunction* JoinEIKSessions(UObject* WorldContextObject, FSessionFindStruct SessionToJoin);
+	static UEIK_JoinSession_AsyncFunction* JoinEIKSessions(UObject* WorldContextObject,
+		FName SessionName,
+		FSessionFindStruct SessionToJoin,
+		bool bLanSession = false);
 
 	FSessionFindStruct Var_SessionToJoin;
+	
+	UPROPERTY()
 	UObject* Var_WorldContextObject;
 
 
 	void Activate() override;
-
 	void JoinSession();
-
 	void OnJoinSessionCompleted(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
 };

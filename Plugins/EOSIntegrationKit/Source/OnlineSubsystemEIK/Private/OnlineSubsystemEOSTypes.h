@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -6,6 +6,7 @@
 #include "Interfaces/OnlinePresenceInterface.h"
 #include "Interfaces/OnlineUserInterface.h"
 #include "EOSShared.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "EOSSharedTypes.h"
 #include "IPAddress.h"
 #include "OnlineSubsystem.h"
@@ -40,7 +41,15 @@ public:
 	virtual const uint8* GetBytes() const override;
 	virtual int32 GetSize() const override;
 	virtual bool IsValid() const override;
+#if ENGINE_MAJOR_VERSION == 5
 	virtual uint32 GetTypeHash() const override;
+#else
+	virtual uint32 GetTypeHash() const;
+	friend uint32 GetTypeHash(const FUniqueNetIdEOS& A)
+	{
+		return ::GetTypeHash(A.EpicAccountId);
+	}
+#endif
 	virtual FString ToString() const override;
 	virtual FString ToDebugString() const override;
 
@@ -340,16 +349,21 @@ protected:
 };
 
 /** Class to handle all callbacks generically using a lambda to process callback results */
+#if ENGINE_MAJOR_VERSION == 5
 template<typename CallbackFuncType, typename CallbackType, typename OwningType>
+#else
+template<typename CallbackFuncType, typename CallbackType>
+#endif
 class TEOSCallback :
 	public FCallbackBase
 {
 public:
 	TFunction<void(const CallbackType*)> CallbackLambda;
 
+#if ENGINE_MAJOR_VERSION == 5
 	TEOSCallback(TWeakPtr<OwningType> InOwner)
-		: FCallbackBase()
-		, Owner(InOwner)
+	: FCallbackBase()
+	, Owner(InOwner)
 	{
 	}
 	TEOSCallback(TWeakPtr<const OwningType> InOwner)
@@ -357,6 +371,13 @@ public:
 		, Owner(InOwner)
 	{
 	}
+#else
+	TEOSCallback()
+	{
+
+	}
+#endif
+	
 	virtual ~TEOSCallback() = default;
 
 
@@ -365,11 +386,11 @@ public:
 		return &CallbackImpl;
 	}
 
-
+#if ENGINE_MAJOR_VERSION == 5
 protected:
 	/** The object that needs to be checked for lifetime before calling the callback */
 	TWeakPtr<const OwningType> Owner;
-
+#endif
 private:
 	static void EOS_CALL CallbackImpl(const CallbackType* Data)
 	{
@@ -383,11 +404,16 @@ private:
 		TEOSCallback* CallbackThis = (TEOSCallback*)Data->ClientData;
 		check(CallbackThis);
 
+#if ENGINE_MAJOR_VERSION == 5
 		if (CallbackThis->Owner.IsValid() && CallbackThis->CallbackLambda)
 		{
 			check(CallbackThis->CallbackLambda);
 			CallbackThis->CallbackLambda(Data);
 		}
+#else
+		check(CallbackThis->CallbackLambda);
+		CallbackThis->CallbackLambda(Data);
+#endif
 		delete CallbackThis;
 	}
 };
@@ -396,7 +422,11 @@ namespace OSSInternalCallback
 {
 	/** Create a callback for a non-SDK function that is tied to the lifetime of an arbitrary shared pointer. */
 	template <typename DelegateType, typename OwnerType, typename... CallbackArgs>
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >3
+	[[nodiscard]] DelegateType Create(const TSharedPtr<OwnerType, ESPMode::ThreadSafe>& InOwner,
+#else
 	UE_NODISCARD DelegateType Create(const TSharedPtr<OwnerType, ESPMode::ThreadSafe>& InOwner,
+#endif  
 		const TFunction<void(CallbackArgs...)>& InUserCallback)
 	{
 		const DelegateType& CheckOwnerThenExecute = DelegateType::CreateLambda(
@@ -417,6 +447,7 @@ namespace OSSInternalCallback
  * Class to handle nested callbacks (callbacks that are tied to an external callback's lifetime,
  * e.g. file chunkers) generically using a lambda to process callback results
  */
+#if ENGINE_MAJOR_VERSION == 5
 template<typename CallbackFuncType, typename CallbackType, typename OwningType,
 	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType>
 class TEOSCallbackWithNested1 :
@@ -427,6 +458,15 @@ public:
 		: TEOSCallback<CallbackFuncType, CallbackType, OwningType>(InOwner)
 	{
 	}
+#else
+template<typename CallbackFuncType, typename CallbackType,
+	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType>
+class TEOSCallbackWithNested1 :
+	public TEOSCallback<CallbackFuncType, CallbackType>
+{
+public:
+	TEOSCallbackWithNested1() = default;
+#endif
 	virtual ~TEOSCallbackWithNested1() = default;
 
 
@@ -446,13 +486,17 @@ private:
 	static Nested1ReturnType EOS_CALL Nested1CallbackImpl(const Nested1CallbackType* Data)
 	{
 		check(IsInGameThread());
+#if ENGINE_MAJOR_VERSION == 5
 		TEOSCallbackWithNested1* CallbackThis = (TEOSCallbackWithNested1*)Data->ClientData;
 		check(CallbackThis);
-
 		if (!CallbackThis->Owner.IsValid())
 		{
 			return Nested1ReturnType();
 		}
+#else
+		TEOSCallbackWithNested1* CallbackThis = (TEOSCallbackWithNested1*)Data->ClientData;
+		check(CallbackThis);
+#endif
 
 		check(CallbackThis->CallbackLambda);
 		return CallbackThis->Nested1CallbackLambda(Data);
@@ -463,6 +507,7 @@ private:
  * Class to handle 2 nested callbacks (callbacks that are tied to an external callback's lifetime,
  * e.g. file chunkers) generically using a lambda to process callback results
  */
+#if ENGINE_MAJOR_VERSION == 5
 template<typename CallbackFuncType, typename CallbackType, typename OwningType,
 	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType,
 	typename Nested2CallbackFuncType, typename Nested2CallbackType>
@@ -474,6 +519,16 @@ public:
 		: TEOSCallbackWithNested1<CallbackFuncType, CallbackType, OwningType, Nested1CallbackFuncType, Nested1CallbackType, Nested1ReturnType>(InOwner)
 	{
 	}
+#else
+template<typename CallbackFuncType, typename CallbackType,
+	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType,
+	typename Nested2CallbackFuncType, typename Nested2CallbackType>
+class TEOSCallbackWithNested2 :
+	public TEOSCallbackWithNested1<CallbackFuncType, CallbackType, Nested1CallbackFuncType, Nested1CallbackType, Nested1ReturnType>
+{
+public:
+	TEOSCallbackWithNested2() = default;
+#endif
 	virtual ~TEOSCallbackWithNested2() = default;
 
 
@@ -495,21 +550,24 @@ private:
 		check(IsInGameThread());
 		TEOSCallbackWithNested2* CallbackThis = (TEOSCallbackWithNested2*)Data->ClientData;
 		check(CallbackThis);
-
+#if ENGINE_MAJOR_VERSION == 5
 		if (CallbackThis->Owner.IsValid())
 		{
 			check(CallbackThis->CallbackLambda);
 			CallbackThis->Nested2CallbackLambda(Data);
 		}
+#else
+		check(CallbackThis->CallbackLambda);
+		CallbackThis->Nested2CallbackLambda(Data);
+#endif
 	}
 };
-
-
 
 /**
  * Class to handle nested callbacks (callbacks that are tied to an external callback's lifetime,
  * e.g. file chunkers) generically using a lambda to process callback results
  */
+#if ENGINE_MAJOR_VERSION == 5
 template<typename CallbackFuncType, typename CallbackType, typename OwningType,
 	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType>
 class TEOSCallbackWithNested1Param3 :
@@ -520,6 +578,15 @@ public:
 		: TEOSCallback<CallbackFuncType, CallbackType, OwningType>(InOwner)
 	{
 	}
+#else
+template<typename CallbackFuncType, typename CallbackType,
+	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType>
+	class TEOSCallbackWithNested1Param3 :
+	public TEOSCallback<CallbackFuncType, CallbackType>
+{
+public:
+	TEOSCallbackWithNested1Param3() = default;
+#endif
 	virtual ~TEOSCallbackWithNested1Param3() = default;
 
 
@@ -541,11 +608,12 @@ private:
 		check(IsInGameThread());
 		TEOSCallbackWithNested1Param3* CallbackThis = (TEOSCallbackWithNested1Param3*)Data->ClientData;
 		check(CallbackThis);
-
+#if ENGINE_MAJOR_VERSION == 5
 		if (!CallbackThis->Owner.IsValid())
 		{
 			return Nested1ReturnType();
 		}
+#endif
 
 		check(CallbackThis->CallbackLambda);
 		return CallbackThis->Nested1CallbackLambda(Data, OutDataBuffer, OutDataWritten);
@@ -556,6 +624,7 @@ private:
  * Class to handle 2 nested callbacks (callbacks that are tied to an external callback's lifetime,
  * e.g. file chunkers) generically using a lambda to process callback results
  */
+#if ENGINE_MAJOR_VERSION == 5
 template<typename CallbackFuncType, typename CallbackType, typename OwningType,
 	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType,
 	typename Nested2CallbackFuncType, typename Nested2CallbackType>
@@ -567,6 +636,16 @@ public:
 		: TEOSCallbackWithNested1Param3<CallbackFuncType, CallbackType, OwningType, Nested1CallbackFuncType, Nested1CallbackType, Nested1ReturnType>(InOwner)
 	{
 	}
+#else
+template<typename CallbackFuncType, typename CallbackType,
+	typename Nested1CallbackFuncType, typename Nested1CallbackType, typename Nested1ReturnType,
+	typename Nested2CallbackFuncType, typename Nested2CallbackType>
+	class TEOSCallbackWithNested2ForNested1Param3 :
+	public TEOSCallbackWithNested1Param3<CallbackFuncType, CallbackType, Nested1CallbackFuncType, Nested1CallbackType, Nested1ReturnType>
+{
+public:
+	TEOSCallbackWithNested2ForNested1Param3() = default;
+#endif
 	virtual ~TEOSCallbackWithNested2ForNested1Param3() = default;
 
 
@@ -588,12 +667,16 @@ private:
 		check(IsInGameThread());
 		TEOSCallbackWithNested2ForNested1Param3* CallbackThis = (TEOSCallbackWithNested2ForNested1Param3*)Data->ClientData;
 		check(CallbackThis);
-
+#if ENGINE_MAJOR_VERSION == 5
 		if (CallbackThis->Owner.IsValid())
 		{
 			check(CallbackThis->CallbackLambda);
 			CallbackThis->Nested2CallbackLambda(Data);
 		}
+#else
+		check(CallbackThis->CallbackLambda);
+		CallbackThis->Nested2CallbackLambda(Data);
+#endif
 	}
 };
 
@@ -611,17 +694,18 @@ protected:
 	{
 		return *this;
 	}
+	
+public:
 
-PACKAGE_SCOPE:
 	/** Constructor */
 	FOnlineSessionInfoEOS();
 
 	FOnlineSessionInfoEOS(const FOnlineSessionInfoEOS& Src)
 		: FOnlineSessionInfo(Src)
-		, HostAddr(Src.HostAddr)
 		, SessionId(Src.SessionId)
 		, SessionHandle(Src.SessionHandle)
 		, bIsFromClone(true)
+		, HostAddr(Src.HostAddr)
 	{
 	}
 
@@ -633,16 +717,17 @@ PACKAGE_SCOPE:
 	void InitLAN(FOnlineSubsystemEOS* Subsystem);
 
 	FString EOSAddress;
-	/** The ip & port that the host is listening on (valid for LAN/GameServer) */
-	TSharedPtr<class FInternetAddr> HostAddr;
+
 	/** Unique Id for this session */
 	FUniqueNetIdStringRef SessionId;
 	/** EOS session handle. Note: this needs to be released by the SDK */
 	EOS_HSessionDetails SessionHandle;
 	/** Whether we should delete this handle or not */
 	bool bIsFromClone;
-
-public:
+	
+	/** The ip & port that the host is listening on (valid for LAN/GameServer) */
+	TSharedPtr<class FInternetAddr> HostAddr;
+	
 	virtual ~FOnlineSessionInfoEOS();
 	bool operator==(const FOnlineSessionInfoEOS& Other) const
 	{

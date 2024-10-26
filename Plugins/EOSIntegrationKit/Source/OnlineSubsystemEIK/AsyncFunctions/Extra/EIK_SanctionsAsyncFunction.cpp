@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_SanctionsAsyncFunction.h"
@@ -63,11 +63,22 @@ void UEIK_SanctionsAsyncFunction::GetFinalValues()
 	{
 		if (FOnlineSubsystemEOS* EOSRef = static_cast<FOnlineSubsystemEOS*>(OnlineSub))
 		{
-			TArray<FSanctionsStruct> SanctionsArray;
+			TArray<FEIK_Sanctions_PlayerSanction> SanctionsArray;
 			EOS_Sanctions_GetPlayerSanctionCountOptions SanctionsCountOptions;
 			SanctionsCountOptions.ApiVersion = EOS_SANCTIONS_GETPLAYERSANCTIONCOUNT_API_LATEST;
 			SanctionsCountOptions.TargetUserId = EOS_ProductUserId_FromString(TCHAR_TO_UTF8(*Var_TargetProductUserID));
 			uint32_t SanctionsCount = EOS_Sanctions_GetPlayerSanctionCount(EOSRef->SanctionsHandle,&SanctionsCountOptions);
+			if(SanctionsCount <= 0)
+			{
+				Success.Broadcast(SanctionsArray);
+				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
+				return;
+			}
 			EOS_Sanctions_CopyPlayerSanctionByIndexOptions SanctionsCopyOptions;
 			EOS_Sanctions_PlayerSanction ** OutSanction = new EOS_Sanctions_PlayerSanction*[SanctionsCount];
 			SanctionsCopyOptions.ApiVersion = EOS_SANCTIONS_COPYPLAYERSANCTIONBYINDEX_API_LATEST;
@@ -79,18 +90,14 @@ void UEIK_SanctionsAsyncFunction::GetFinalValues()
 				{
 					if (OutSanction[i])
 					{
-						FSanctionsStruct SanctionStruct;
-						SanctionStruct.ApiVersion = OutSanction[i]->ApiVersion;
-						SanctionStruct.Action = FString(OutSanction[i]->Action);
-						SanctionStruct.ReferenceId = FString(OutSanction[i]->ReferenceId);
-						SanctionStruct.TimeExpires = OutSanction[i]->TimeExpires;
-						SanctionStruct.TimePlaced = OutSanction[i]->TimePlaced;
-						SanctionsArray.Add(SanctionStruct);
+						FEIK_Sanctions_PlayerSanction LocalTempRef = *OutSanction[i];
+						SanctionsArray.Add(LocalTempRef);
 					}
 				}
 				for(int32 i=0; i < (int32)SanctionsCount;i++)
 				{
-					EOS_Sanctions_PlayerSanction_Release(OutSanction[i]);
+					if(OutSanction[i])
+						EOS_Sanctions_PlayerSanction_Release(OutSanction[i]);
 				}
 			}
 			else
@@ -100,6 +107,11 @@ void UEIK_SanctionsAsyncFunction::GetFinalValues()
 			}
 			Success.Broadcast(SanctionsArray);
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 		else
 		{
@@ -114,8 +126,13 @@ void UEIK_SanctionsAsyncFunction::GetFinalValues()
 
 void UEIK_SanctionsAsyncFunction::FireFailure()
 {
-	Failure.Broadcast(TArray<FSanctionsStruct>());
+	Failure.Broadcast(TArray<FEIK_Sanctions_PlayerSanction>());
 	SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+	MarkAsGarbage();
+#else
+	MarkPendingKill();
+#endif
 }
 
 void UEIK_SanctionsAsyncFunction::Activate()
