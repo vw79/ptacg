@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_GetPlayerData_AsyncFunction.h"
@@ -8,6 +8,7 @@
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Interfaces/OnlineUserCloudInterface.h"
 #include "Kismet/GameplayStatics.h"
+#include "OnlineSubsystemEIK/SdkFunctions/ConnectInterface/EIK_ConnectSubsystem.h"
 
 UEIK_GetPlayerData_AsyncFunction* UEIK_GetPlayerData_AsyncFunction::GetPlayerData(FString FileName)
 {
@@ -32,18 +33,19 @@ void UEIK_GetPlayerData_AsyncFunction::GetPlayerData()
 			{
 				if(!IdentityPointerRef->GetUniquePlayerId(0))
 				{
-					if(UEIKSettings* EIKSettings = GetMutableDefault<UEIKSettings>())
-					{
-						if (EIKSettings->bShowAdvancedLogs)
 						{
-							UE_LOG(LogTemp, Error, TEXT("EIK Log: GetPlayerData: IdentityPointerRef->GetUniquePlayerId(0) is nullptr"));
+							UE_LOG(LogEIK, Error, TEXT("EIK Log: GetPlayerData: IdentityPointerRef->GetUniquePlayerId(0) is nullptr"));
 						}
-					}
 					if(!bDelegateCalled)
 					{
 						bDelegateCalled = true;
 						OnFail.Broadcast(false, TArray<uint8>());
 						SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+						MarkAsGarbage();
+#else
+						MarkPendingKill();
+#endif
 					}
 				}
 				TSharedPtr<const FUniqueNetId> UserIDRef = IdentityPointerRef->GetUniquePlayerId(0).ToSharedRef();
@@ -57,6 +59,11 @@ void UEIK_GetPlayerData_AsyncFunction::GetPlayerData()
 					bDelegateCalled = true;
 					OnFail.Broadcast(false, TArray<uint8>());
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -67,6 +74,11 @@ void UEIK_GetPlayerData_AsyncFunction::GetPlayerData()
 				bDelegateCalled = true;
 				OnFail.Broadcast(false, TArray<uint8>());
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -77,6 +89,11 @@ void UEIK_GetPlayerData_AsyncFunction::GetPlayerData()
 			bDelegateCalled = true;
 			OnFail.Broadcast(false, TArray<uint8>());
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }
@@ -95,13 +112,18 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 					TSharedPtr<const FUniqueNetId> UserIDRef = IdentityPointerRef->GetUniquePlayerId(0).ToSharedRef();
 					TArray<uint8> FileContents;
 					CloudPointerRef->GetFileContents(*UserIDRef,FileName,FileContents);
-					if(!FileContents.IsEmpty())
+					if(FileContents.Num() > 0)
 					{
 						if(!bDelegateCalled)
 						{
 							bDelegateCalled = true;
 							OnSuccess.Broadcast(true, FileContents);
 							SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+							MarkAsGarbage();
+#else
+							MarkPendingKill();
+#endif
 						}
 					}
 					else
@@ -111,6 +133,11 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 							bDelegateCalled = true;
 							OnFail.Broadcast(false, TArray<uint8>());
 							SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+							MarkAsGarbage();
+#else
+							MarkPendingKill();
+#endif
 						}
 					}
 				}
@@ -121,6 +148,11 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 						bDelegateCalled = true;
 						OnFail.Broadcast(false, TArray<uint8>());
 						SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+						MarkAsGarbage();
+#else
+						MarkPendingKill();
+#endif
 					}
 				}
 			}
@@ -131,6 +163,11 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 					bDelegateCalled = true;
 					OnFail.Broadcast(false, TArray<uint8>());
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -141,6 +178,11 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 				bDelegateCalled = true;
 				OnFail.Broadcast(false, TArray<uint8>());
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -151,6 +193,11 @@ void UEIK_GetPlayerData_AsyncFunction::OnGetFileComplete(bool bSuccess, const FU
 			bDelegateCalled = true;
 			OnFail.Broadcast(false, TArray<uint8>());
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }

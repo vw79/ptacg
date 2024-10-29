@@ -1,7 +1,11 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "InternetAddrEIK.h"
+#if ENGINE_MAJOR_VERSION == 5
 #include "Online/CoreOnline.h"
+#else
+#include "UObject/CoreOnline.h"
+#endif
 #include "EOSSharedTypes.h"
 #include "Containers/StringView.h"
 
@@ -166,12 +170,11 @@ FString FInternetAddrEOS::ToString(bool bAppendPort) const
 
 uint32 FInternetAddrEOS::GetTypeHash() const
 {
-#if ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION == 2
+#if ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION >= 2
 	return HashCombine(HashCombine(HashCombine(GetTypeHashHelper((void*)LocalUserId), GetTypeHashHelper((void*)RemoteUserId)), GetTypeHashHelper(FAnsiStringView(SocketName, EOS_SOCKET_NAME_SIZE))), Channel);
-#elif ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION == 1
+#else 
 	return HashCombine(HashCombine(HashCombine(::GetTypeHash((void*)LocalUserId), ::GetTypeHash((void*)RemoteUserId)), ::GetTypeHash(FAnsiStringView(SocketName, EOS_SOCKET_NAME_SIZE))), Channel);
 #endif
-	return 0;
 }
 
 bool FInternetAddrEOS::IsValid() const

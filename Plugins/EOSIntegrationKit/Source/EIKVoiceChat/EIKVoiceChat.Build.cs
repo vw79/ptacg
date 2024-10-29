@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using System;
 using System.IO;
@@ -16,7 +16,8 @@ namespace UnrealBuildTool.Rules
 			PublicDependencyModuleNames.AddRange(
 				new string[]
 				{
-					"Json"
+					"Json",
+					"AudioExtensions"
 				}
 			);
 
@@ -36,9 +37,12 @@ namespace UnrealBuildTool.Rules
                     "EIKShared",
                     "EIKSDK",
 					"Engine",
-                    "StructUtils",
-                    "HTTP",
-                }
+                    "HTTP", 
+                    "EOSIntegrationKit",
+					"Synthesis",
+					"SignalProcessing",
+					"AudioMixer",
+				}
 			);
 
 			if(Target.Platform == UnrealTargetPlatform.IOS)

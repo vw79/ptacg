@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "OnlineSubsystemEOS.h"
 #include "OnlineSubsystemEOSPrivate.h"
@@ -96,8 +96,13 @@ public:
 	virtual FOnVoiceChatPlayerTalkingUpdatedDelegate& OnVoiceChatPlayerTalkingUpdated() override { return VoiceChatUser.OnVoiceChatPlayerTalkingUpdated(); }
 	virtual void SetPlayerMuted(const FString& PlayerName, bool bMuted) override { VoiceChatUser.SetPlayerMuted(PlayerName, bMuted); }
 	virtual bool IsPlayerMuted(const FString& PlayerName) const override { return VoiceChatUser.IsPlayerMuted(PlayerName); }
+#if ENGINE_MAJOR_VERSION == 5
 	virtual void SetChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName, bool bMuted) override { VoiceChatUser.SetChannelPlayerMuted(ChannelName, PlayerName, bMuted); }
 	virtual bool IsChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName) const override { return VoiceChatUser.IsChannelPlayerMuted(ChannelName, PlayerName); }
+#else
+	virtual void SetChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName, bool bMuted) { VoiceChatUser.SetChannelPlayerMuted(ChannelName, PlayerName, bMuted); }
+	virtual bool IsChannelPlayerMuted(const FString& ChannelName, const FString& PlayerName) const { return VoiceChatUser.IsChannelPlayerMuted(ChannelName, PlayerName); }
+#endif
 	virtual FOnVoiceChatPlayerMuteUpdatedDelegate& OnVoiceChatPlayerMuteUpdated() override { return VoiceChatUser.OnVoiceChatPlayerMuteUpdated(); }
 	virtual void SetPlayerVolume(const FString& PlayerName, float Volume) override { VoiceChatUser.SetPlayerVolume(PlayerName, Volume); }
 	virtual float GetPlayerVolume(const FString& PlayerName) const override { return VoiceChatUser.GetPlayerVolume(PlayerName); }
@@ -108,7 +113,7 @@ public:
 	virtual void TransmitToSpecificChannels(const TSet<FString>& ChannelNames) override { VoiceChatUser.TransmitToSpecificChannels(ChannelNames); }
 	virtual TSet<FString> GetTransmitChannels() const override { return VoiceChatUser.GetTransmitChannels(); }
 
-#elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >=1
+#else
 	virtual void TransmitToSpecificChannel(const FString& ChannelName) override { VoiceChatUser.TransmitToSpecificChannel(ChannelName); }
 	virtual FString GetTransmitChannel() const override { return VoiceChatUser.GetTransmitChannel(); }
 #endif
@@ -262,7 +267,6 @@ bool FOnlineSubsystemEOS::PlatformCreate()
 		UE_LOG_ONLINE(Error, TEXT("FOnlineSubsystemEOS::PlatformCreate() failed to init EOS platform"));
 		return false;
 	}
-
 	return true;
 }
 
@@ -279,7 +283,7 @@ bool FOnlineSubsystemEOS::Init()
 	// Check for being launched by EGS
 	bWasLaunchedByEGS = FParse::Param(FCommandLine::Get(), TEXT("EpicPortal"));
 	FEOSSettings EOSSettings = UEIKSettings::GetSettings();
-	if (!IsRunningDedicatedServer() && IsRunningGame() && !bWasLaunchedByEGS && EOSSettings.bShouldEnforceBeingLaunchedByEGS)
+	if (!IsRunningDedicatedServer() && IsRunningGame() && !bWasLaunchedByEGS && EOSSettings.bUseLauncherChecks)
 	{
 		FString ArtifactName;
 		FParse::Value(FCommandLine::Get(), TEXT("EpicApp="), ArtifactName);
@@ -311,17 +315,22 @@ bool FOnlineSubsystemEOS::Init()
 	AntiCheatClientHandle = EOS_Platform_GetAntiCheatClientInterface(*EOSPlatformHandle);
 	if (AntiCheatClientHandle == nullptr)
 	{
-		UE_LOG_ONLINE(Error, TEXT("FOnlineSubsystemEOS: failed to init EOS platform, couldn't get anti cheat client handle. This is expected if you are not using Easy Anti Cheat."));
+		UE_LOG(LogEIK, Log, TEXT("FOnlineSubsystemEOS: failed to init EOS platform, couldn't get anti cheat client handle. This is expected if you are not using Easy Anti Cheat."));
 	}
 	SanctionsHandle = EOS_Platform_GetSanctionsInterface(*EOSPlatformHandle);
 	if(SanctionsHandle == nullptr)
 	{
 		UE_LOG_ONLINE(Error, TEXT("FOnlineSubsystemEOS: failed to get Sanctions Handle"));
 	}
+	ReportsHandle = EOS_Platform_GetReportsInterface(*EOSPlatformHandle);
+	if (ReportsHandle == nullptr)
+	{
+		UE_LOG_ONLINE(Error, TEXT("FOnlineSubsystemEOS: failed to get Reports Handle"));
+	}
 	AntiCheatServerHandle = EOS_Platform_GetAntiCheatServerInterface(*EOSPlatformHandle);
 	if (AntiCheatServerHandle == nullptr)
 	{
-		UE_LOG_ONLINE(Error, TEXT("FOnlineSubsystemEOS: failed to init EOS platform, couldn't get anti cheat server handle. This is expected if you are not using Easy Anti Cheat."));
+		UE_LOG(LogEIK, Log, TEXT("FOnlineSubsystemEOS: failed to init EOS platform, couldn't get anti cheat server handle. This is expected if you are not using Easy Anti Cheat."));
 	}
 	UserInfoHandle = EOS_Platform_GetUserInfoInterface(*EOSPlatformHandle);
 	if (UserInfoHandle == nullptr)
@@ -479,7 +488,7 @@ bool FOnlineSubsystemEOS::Shutdown()
 	for (TPair<FUniqueNetIdRef, FOnlineSubsystemEOSVoiceChatUserWrapperRef>& Pair : LocalVoiceChatUsers)
 	{
 		FOnlineSubsystemEOSVoiceChatUserWrapperRef& VoiceChatUserWrapper = Pair.Value;
-		VoiceChatInterface->ReleaseUser(&VoiceChatUserWrapper->VoiceChatUser);
+		//VoiceChatInterface->ReleaseUser(&VoiceChatUserWrapper->VoiceChatUser);
 	}
 	LocalVoiceChatUsers.Reset();
 	VoiceChatInterface = nullptr;
@@ -498,8 +507,8 @@ bool FOnlineSubsystemEOS::Tick(float DeltaTime)
 	}
 
 	SessionInterfacePtr->Tick(DeltaTime);
+	UserManager->Tick(DeltaTime);
 	FOnlineSubsystemImpl::Tick(DeltaTime);
-
 	return true;
 }
 
@@ -552,8 +561,11 @@ void FOnlineSubsystemEOS::ReloadConfigs(const TSet<FString>& ConfigSections)
 	}
 
 	// Notify user code so that overrides may be applied.
+#if ENGINE_MAJOR_VERSION == 5
 	TriggerOnConfigChangedDelegates(ConfigSections);
-
+#else
+	//TriggerOnConfigChangedDelegates(ConfigSections);
+#endif
 	// Reload config objects.
 	if (bConfigChanged)
 	{

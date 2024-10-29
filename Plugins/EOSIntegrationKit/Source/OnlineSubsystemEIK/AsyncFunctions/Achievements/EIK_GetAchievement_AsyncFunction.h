@@ -1,9 +1,13 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#if ENGINE_MAJOR_VERSION == 5
 #include "Online/CoreOnline.h"
+#else
+#include "UObject/CoreOnline.h"
+#endif
 #include "Kismet/BlueprintAsyncActionBase.h"
 #include "EIK_GetAchievement_AsyncFunction.generated.h"
 
@@ -19,7 +23,7 @@ public:
 
 	/** The progress towards completing this achievement: 0.0-100.0 */
 	UPROPERTY(BlueprintReadOnly, Category="EIK Struct")
-	double Progress = 0.0;
+	float Progress = 0.0;
 
 
 };

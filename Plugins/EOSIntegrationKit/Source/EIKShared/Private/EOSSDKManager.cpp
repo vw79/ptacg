@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "EOSSDKManager.h"
 #include "Runtime/Launch/Resources/Version.h"
@@ -14,7 +14,6 @@
 #include "Misc/Paths.h"
 #include "Misc/ConfigCacheIni.h"
 #include "ProfilingDebugging/CsvProfiler.h"
-#include "ProfilingDebugging/CallstackTrace.h"
 #include "Stats/Stats.h"
 #include "Runtime/Projects/Public/Interfaces/IPluginManager.h"
 #include "CoreGlobals.h"
@@ -124,7 +123,7 @@ namespace
 
 		// Get the plugin object by module name
 		TSharedPtr<IPlugin> Plugin = PluginManager.FindPlugin(PluginModuleName);
-
+		
 		if (Plugin.IsValid())
 		{
 			// Get the plugin's directory
@@ -132,16 +131,21 @@ namespace
 
 			// Build the path to the binary
 			FString BinaryPath = FPaths::Combine(*PluginDirectory, TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
-
+			FString SecondBinaryPath = FPaths::Combine(*PluginDirectory, TEXT("Source"), TEXT("ThirdParty"), TEXT("EIKSDK"), TEXT("Bin"), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME));
 			// Check if the file exists before attempting to load
 			if (FPaths::FileExists(BinaryPath))
 			{
-				UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from plugin binaries: %s"), *BinaryPath);
+				UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from plugin binaries: %s."), *BinaryPath);
 				Result = FPlatformProcess::GetDllHandle(*BinaryPath);
+			}
+			else if (FPaths::FileExists(SecondBinaryPath))
+			{
+				UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from main plugin binaries: %s."), *SecondBinaryPath);
+				Result = FPlatformProcess::GetDllHandle(*SecondBinaryPath);
 			}
 			else
 			{
-				UE_LOG(LogEOSSDK, Log, TEXT("EOS SDK binary not found: %s"), *BinaryPath);
+				UE_LOG(LogEOSSDK, Log, TEXT("EOS SDK binary not found: %s. Now project binaries will be looked up."), *BinaryPath);
 			}
 		}
 		else
@@ -149,19 +153,23 @@ namespace
 			UE_LOG(LogEOSSDK, Log, TEXT("Plugin not found: %s"), *PluginModuleName);
 		}
 		const FString ProjectBinaryPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::GetRelativePathToRoot(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME)));
-		if (FPaths::FileExists(ProjectBinaryPath))
+
+		if(!Result)
 		{
-			UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from project binaries: %s"), *ProjectBinaryPath);
-			Result = FPlatformProcess::GetDllHandle(*ProjectBinaryPath);
-		}
-		else
-		{
-			UE_LOG(LogEOSSDK, Log, TEXT("Unable to find EOS SDK in project binaries: %s"), *ProjectBinaryPath);
+			if (FPaths::FileExists(ProjectBinaryPath))
+			{
+				UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from project binaries: %s"), *ProjectBinaryPath);
+				Result = FPlatformProcess::GetDllHandle(*ProjectBinaryPath);
+			}
+			else
+			{
+				UE_LOG(LogEOSSDK, Log, TEXT("Unable to find EOS SDK in project binaries: %s"), *ProjectBinaryPath);
+			}
 		}
 
 		if (!Result)
 		{
-			UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from engine binaries"));
+			UE_LOG(LogEOSSDK, Log, TEXT("Loading EOS SDK from engine binaries. This may not be good if you are using a older version of the SDK."));
 			const FString EngineBinaryPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::EngineDir(), TEXT("Binaries"), FPlatformProcess::GetBinariesSubdirectory(), TEXT(EOSSDK_RUNTIME_LIBRARY_NAME)));
 			if (FPaths::FileExists(EngineBinaryPath))
 			{
@@ -261,7 +269,7 @@ EOS_EResult FEIKSDKManager::Initialize()
 
 		EOS_EResult EosResult = EOSInitialize(InitializeOptions);
 
-		if (EosResult == EOS_EResult::EOS_Success)
+		if (EosResult == EOS_EResult::EOS_Success || EosResult == EOS_EResult::EOS_AlreadyConfigured)
 		{
 			bInitialized = true;
 #if ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION == 2 || ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION == 3
@@ -532,14 +540,22 @@ void FEIKSDKManager::SetupTicker()
 {
 	if (TickerHandle.IsValid())
 	{
+#if ENGINE_MAJOR_VERSION == 5
 		FTSTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+#else
+		FTicker::GetCoreTicker().RemoveTicker(TickerHandle);
+#endif
 		TickerHandle.Reset();
 	}
 
 	if (ActivePlatforms.Num() > 0)
 	{
 		const double TickIntervalSeconds = ConfigTickIntervalSeconds > SMALL_NUMBER ? ConfigTickIntervalSeconds / ActivePlatforms.Num() : 0.f;
+#if ENGINE_MAJOR_VERSION == 5
 		TickerHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FEIKSDKManager::Tick), TickIntervalSeconds);
+#else
+		TickerHandle = FTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FEIKSDKManager::Tick), TickIntervalSeconds);
+#endif
 	}
 }
 
@@ -695,7 +711,7 @@ void FEIKSDKManager::Shutdown()
 			ReleaseReleasedPlatforms();
 		}
 
-#if ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION == 2
+#if ENGINE_MAJOR_VERSION ==5 && ENGINE_MINOR_VERSION >= 2
 		FCoreDelegates::TSOnConfigSectionsChanged().RemoveAll(this);
 #elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION == 1
 		FCoreDelegates::OnConfigSectionsChanged.RemoveAll(this);

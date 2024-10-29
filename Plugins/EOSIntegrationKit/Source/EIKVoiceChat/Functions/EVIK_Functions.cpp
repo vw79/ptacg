@@ -2,6 +2,8 @@
 
 
 #include "EVIK_Functions.h"
+
+#include "EIKSettings.h"
 #include "Engine/Engine.h"
 #include "Interfaces/IHttpResponse.h"
 
@@ -78,18 +80,21 @@ bool UEVIK_Functions::IsVoiceChatConnected(const UObject* WorldContextObject)
 
 void UEVIK_Functions::LoginEOSVoiceChat(const UObject* WorldContextObject, FString PlayerName, const FEIKResultDelegate& Result)
 {
-	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
-	
-	if (World)
+	// Remove spaces from PlayerName
+	PlayerName = PlayerName.Replace(TEXT(" "), TEXT(""));
+	if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
 	{
 		if (const UGameInstance* GameInstance = World->GetGameInstance())
 		{
-			UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>();
-			if (LocalVoiceSubsystem)
+			if (UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>())
 			{
 				if(LocalVoiceSubsystem->EVIK_Local_GetVoiceChat())
 				{
+#if ENGINE_MAJOR_VERSION == 5
 					const FPlatformUserId PlatformUserId = FPlatformMisc::GetPlatformUserForUserIndex(0);
+#else
+					const FPlatformUserId PlatformUserId = PLATFORMUSERID_NONE;
+#endif
 					LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->Login(PlatformUserId, PlayerName, "", FOnVoiceChatLoginCompleteDelegate::CreateLambda([Result](const FString& PlayerName, const FVoiceChatResult& Result1)
 					{
 						if(Result1.IsSuccess())
@@ -108,10 +113,12 @@ void UEVIK_Functions::LoginEOSVoiceChat(const UObject* WorldContextObject, FStri
 						}
 					}
 					));
+					return;
 				}	
 			}
 		}
 	}
+	Result.ExecuteIfBound(false, EEVIKResultCodes::Failed);
 }
 
 void UEVIK_Functions::LogoutEOSVoiceChat(const UObject* WorldContextObject, FString PlayerName,
@@ -218,23 +225,40 @@ FString UEVIK_Functions::LoggedInUser(const UObject* WorldContextObject)
 void UEVIK_Functions::EOSRoomToken(FString VoiceRoomName, FString PlayerName, FString ClientIP, const FEIKRoomTokenResultDelegate& Result)
 {
     FString ProductId, SandboxId, DeploymentId, ClientId, ClientSecret, EncryptionKey;
-    bool bEnabled;
-    if (!GConfig->GetBool(TEXT("EOSVoiceChat"), TEXT("bEnabled"), bEnabled, GEngineIni) || !bEnabled)
-    {
-    	Result.ExecuteIfBound(false, "Error");
-        return;
-    }
+	const UEIKSettings* EIKSettings = GetMutableDefault<UEIKSettings>();
+	if(!EIKSettings || EIKSettings->VoiceArtifactName.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Missing values in EIK Settings"));
+		Result.ExecuteIfBound(false, "Error");
+		return;
+	}
 
     bool bSuccess = true;
-    bSuccess &= GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ProductId"), ProductId, GEngineIni);
-    bSuccess &= GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("SandboxId"), SandboxId, GEngineIni);
-    bSuccess &= GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("DeploymentId"), DeploymentId, GEngineIni);
-    bSuccess &= GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientId"), ClientId, GEngineIni);
-    bSuccess &= GConfig->GetString(TEXT("EOSVoiceChat"), TEXT("ClientSecret"), ClientSecret, GEngineIni);
+    if (EIKSettings && EIKSettings->VoiceArtifactName.Len() > 0)
+	{
+		FEOSArtifactSettings ArtifactSettingsForVoice;
+    	EIKSettings->GetSettingsForArtifact(EIKSettings->VoiceArtifactName, ArtifactSettingsForVoice);
+    	ProductId = ArtifactSettingsForVoice.ProductId;
+    	SandboxId = ArtifactSettingsForVoice.SandboxId;
+    	DeploymentId = ArtifactSettingsForVoice.DeploymentId;
+    	ClientId = ArtifactSettingsForVoice.ClientId;
+    	ClientSecret = ArtifactSettingsForVoice.ClientSecret;
+    	EncryptionKey = ArtifactSettingsForVoice.EncryptionKey;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Missing values in EIK Settings"));
+		Result.ExecuteIfBound(false, "Error");
+		return;
+	}
+	if(ProductId.IsEmpty() || SandboxId.IsEmpty() || DeploymentId.IsEmpty() || ClientId.IsEmpty() || ClientSecret.IsEmpty() || EncryptionKey.IsEmpty())
+	{
+		bSuccess = false;
+	}
 
     if (!bSuccess)
     {
-        UE_LOG(LogTemp, Error, TEXT("Missing values in DefaultEngine.ini"));
+        UE_LOG(LogTemp, Error, TEXT("Missing values for Artifact Settings"));
     	Result.ExecuteIfBound(false, "Error");
         return;
     }
@@ -309,7 +333,7 @@ void UEVIK_Functions::EOSRoomToken(FString VoiceRoomName, FString PlayerName, FS
 									continue;
 
 								auto& Object = Element->AsObject();
-								TokenString = Object->TryGetField("token")->AsString();
+								TokenString = Object->TryGetField(TEXT("token"))->AsString();
 								UE_LOG(LogTemp, Warning, TEXT("Token -> %s"), *TokenString);
 							}
 						}
@@ -527,8 +551,7 @@ bool UEVIK_Functions::SetPlayerVolume(const UObject* WorldContextObject, const F
 	{
 		if (const UGameInstance* GameInstance = World->GetGameInstance())
 		{
-			UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>();
-			if (LocalVoiceSubsystem)
+			if (UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>())
 			{
 				if (LocalVoiceSubsystem->EVIK_Local_GetVoiceChat())
 				{
@@ -619,7 +642,12 @@ bool UEVIK_Functions::TransmitToSelectedRoom(const UObject* WorldContextObject, 
 			{
 				if (LocalVoiceSubsystem->EVIK_Local_GetVoiceChat())
 				{
-					//LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->TransmitToSpecificChannel(RoomName);
+					const TSet<FString> Var_RoomName = {RoomName};
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >=3
+					LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->TransmitToSpecificChannels(Var_RoomName);
+#else
+					LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->TransmitToSpecificChannel(RoomName);
+#endif
 					return true;
 				}
 			}
@@ -752,4 +780,51 @@ bool UEVIK_Functions::SetInputMethods(const UObject* WorldContextObject, FString
 		}
 	}
 	return false;
+}
+
+bool UEVIK_Functions::IsPlayerTalking(const UObject* WorldContextObject, FString PlayerName)
+{
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+	if (World)
+	{
+		if (const UGameInstance* GameInstance = World->GetGameInstance())
+		{
+			UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>();
+			if (LocalVoiceSubsystem)
+			{
+				if (LocalVoiceSubsystem->EVIK_Local_GetVoiceChat())
+				{
+					return LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->IsPlayerTalking(PlayerName);
+					
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void UEVIK_Functions::MuteInputDevice(const UObject* WorldContextObject, bool Mute, bool &bWasSuccess)
+{
+	bWasSuccess = false;
+
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+
+	if (World)
+	{
+		if (const UGameInstance* GameInstance = World->GetGameInstance())
+		{
+			UEIK_Voice_Subsystem* LocalVoiceSubsystem = GameInstance->GetSubsystem<UEIK_Voice_Subsystem>();
+			if (LocalVoiceSubsystem)
+			{
+				if (LocalVoiceSubsystem->EVIK_Local_GetVoiceChat())
+				{
+					LocalVoiceSubsystem->EVIK_Local_GetVoiceChat()->SetAudioInputDeviceMuted(Mute);
+					bWasSuccess = true;
+					return;
+				}
+			}
+		}
+	}
+	return;
 }

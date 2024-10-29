@@ -1,8 +1,12 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 using System.IO;
-
+#if !UE_5_0_OR_LATER
+using Tools.DotNETCommon;
+#else
+using EpicGames.Core;
+#endif
 public class OnlineSubsystemEIK : ModuleRules
 {
 	public OnlineSubsystemEIK(ReadOnlyTargetRules Target) : base(Target)
@@ -18,14 +22,12 @@ public class OnlineSubsystemEIK : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[] {
 				"Core",
-				"CoreOnline",
 				"CoreUObject",
 				"Engine",
 				"EIKSDK",
 				"EIKShared",
 				"EIKVoiceChat",
 				"Json",
-				"OnlineBase",
 				"OnlineSubsystem",
 				"Sockets",
 				"VoiceChat",
@@ -35,15 +37,33 @@ public class OnlineSubsystemEIK : ModuleRules
 				"Projects",
 				"Slate",
 				"SlateCore",
-				"HTTP",
+				"HTTP", 
+				"EOSIntegrationKit",
 			}
 		);
+		#if UE_5_0_OR_LATER
+		PrivateDependencyModuleNames.AddRange(new string[] { "CoreOnline", "Core", "Sockets" , "OnlineBase"});
+		#endif
 
 		
 		PrivateDefinitions.Add("USE_XBL_XSTS_TOKEN=" + (bUseXblXstsToken ? "1" : "0"));
 		PrivateDefinitions.Add("USE_PSN_ID_TOKEN=" + (bUsePsnIdToken ? "1" : "0"));
 		PrivateDefinitions.Add("ADD_USER_LOGIN_INFO=" + (bAddUserLoginInfo ? "1" : "0"));
-		
+		bool bSupportOculusPlatform = false;
+		ConfigHierarchy PlatformGameConfig = ConfigCache.ReadHierarchy(ConfigHierarchyType.Engine, DirectoryReference.FromFile(Target.ProjectFile), UnrealTargetPlatform.Android);
+		if (!PlatformGameConfig.GetBool("OnlineSubsystemOculus", "bEnabled", out bSupportOculusPlatform))
+		{
+			bSupportOculusPlatform = false;
+		}
+		if (bSupportOculusPlatform)
+		{
+			PublicDefinitions.Add("SUPPORTOCULUSPLATFORM=1");
+		}
+		else
+		{
+			PublicDefinitions.Add("SUPPORTOCULUSPLATFORM=0");
+		}
+
 		if (Target.Platform == UnrealTargetPlatform.Android)
 		{
 			PrivateDependencyModuleNames.AddRange(new string[] { "Launch" });
@@ -55,7 +75,6 @@ public class OnlineSubsystemEIK : ModuleRules
 				new string[] {
 					"UnrealEd",
 					"ToolMenus",
-					"EditorFramework"
 				}
 			);
 		}

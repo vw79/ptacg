@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_SetPlayerData_AsyncFunction.h"
@@ -24,7 +24,7 @@ void UEIK_SetPlayerData_AsyncFunction::Activate()
 
 void UEIK_SetPlayerData_AsyncFunction::SetPlayerData()
 {
-	if(!DataToSave.IsEmpty())
+	if(DataToSave.Num() > 0)
 	{
 		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get() )
 		{
@@ -43,6 +43,11 @@ void UEIK_SetPlayerData_AsyncFunction::SetPlayerData()
 						bDelegateCalled = true;
 						OnFail.Broadcast();
 						SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+						MarkAsGarbage();
+#else
+						MarkPendingKill();
+#endif
 					}
 				}
 			}
@@ -53,6 +58,11 @@ void UEIK_SetPlayerData_AsyncFunction::SetPlayerData()
 					bDelegateCalled = true;
 					OnFail.Broadcast();
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -63,6 +73,11 @@ void UEIK_SetPlayerData_AsyncFunction::SetPlayerData()
 				bDelegateCalled = true;
 				OnFail.Broadcast();
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -73,6 +88,11 @@ void UEIK_SetPlayerData_AsyncFunction::SetPlayerData()
 			bDelegateCalled = true;
 			OnFail.Broadcast();
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }
@@ -87,6 +107,11 @@ void UEIK_SetPlayerData_AsyncFunction::OnWriteFileComplete(bool bSuccess, const 
 			bDelegateCalled = true;
 			OnSuccess.Broadcast();
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 	else
@@ -96,6 +121,11 @@ void UEIK_SetPlayerData_AsyncFunction::OnWriteFileComplete(bool bSuccess, const 
 			bDelegateCalled = true;
 			OnFail.Broadcast();
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }

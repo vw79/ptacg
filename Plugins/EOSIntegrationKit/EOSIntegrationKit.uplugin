@@ -1,16 +1,16 @@
 {
 	"FileVersion": 3,
-	"Version": 2,
-	"VersionName": "3.0.1",
+	"Version": 3,
+	"VersionName": "4.5",
 	"FriendlyName": "EOS Integration Kit",
 	"Description": "EIK (Epic Online Services Integration Kit) is a plugin that enables seamless integration between Epic Online Services (EOS) and Unreal Engine. The plugin provides access to the EOS SDK (Software Development Kit) within Unreal Engine, allowing developers to easily implement features such as matchmaking, achievements, leaderboards, and more.",
-	"Category": "Betide Studio Plugins",
+	"Category": "Betide Studio",
 	"CreatedBy": "Betide Studio",
 	"CreatedByURL": "https://betide.studio",
 	"DocsURL": "https://eik.betide.studio/",
 	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/dba0aa05bdd144e69405653a387ad63e",
 	"SupportURL": "https://discord.gg/betidestudio",
-	"EngineVersion": "5.3.0",
+	"EngineVersion": "5.2",
 	"CanContainContent": true,
 	"Installed": true,
 	"Modules": [
@@ -21,7 +21,9 @@
 			"PlatformAllowList": [
 				"Win64",
 				"Android",
-				"Mac"
+				"Mac",
+				"IOS",
+				"Linux"
 			]
 		},
 		{
@@ -30,7 +32,10 @@
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Win64",
-				"Android"
+				"Android",
+				"Mac",
+				"IOS",
+				"Linux"
 			]
 		},
 		{
@@ -39,7 +44,10 @@
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Win64",
-				"Android"
+				"Android",
+				"Mac",
+				"IOS",
+				"Linux"
 			]
 		},
 		{
@@ -48,7 +56,10 @@
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Win64",
-				"Android"
+				"Android",
+				"Mac",
+				"IOS",
+				"Linux"
 			]
 		},
 		{
@@ -57,7 +68,10 @@
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Win64",
-				"Android"
+				"Android",
+				"Mac",
+				"IOS",
+				"Linux"
 			]
 		},
 		{
@@ -65,9 +79,35 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
+				"Android",
 				"Win64",
-				"Android"
+				"Mac",
+				"IOS",
+				"Linux"
 			]
+		},
+		{
+			"Name": "EIKEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		},
+		{
+			"Name": "DiscordGame",
+			"Type": "Runtime",
+			"LoadingPhase": "PostDefault",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "EIKWeb",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
@@ -76,8 +116,10 @@
 			"Enabled": true
 		},
 		{
-			"Name": "StructUtils",
+			"Name": "Synthesis",
 			"Enabled": true
 		}
-	]
+	],
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false
 }

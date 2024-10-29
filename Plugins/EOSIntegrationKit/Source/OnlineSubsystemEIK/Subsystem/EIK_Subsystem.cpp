@@ -1,4 +1,4 @@
-//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+// Copyright (c) 2023 Betide Studio. All Rights Reserved.
 
 
 #include "EIK_Subsystem.h"
@@ -11,10 +11,26 @@
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SaveGame.h"
+#include "eos_sessions.h"
 #include "Interfaces/OnlineLeaderboardInterface.h"
+#include "OnlineSubsystemEIK/SdkFunctions/ConnectInterface/EIK_ConnectSubsystem.h"
 #ifdef PLAYFAB_PLUGIN_INSTALLED
 #include "Core/PlayFabClientAPI.h"
 #endif
+
+
+
+UEIK_Subsystem::UEIK_Subsystem()
+{
+	// Add the delegate to the online subsystem
+	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+	{
+		if(const IOnlineSessionPtr SessionPtrRef = SubsystemRef->GetSessionInterface())
+		{
+			SessionPtrRef->AddOnSessionUserInviteAcceptedDelegate_Handle(FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UEIK_Subsystem::FuncEK_OnSessionUserInviteAccepted));
+		}
+	}
+}
 
 
 void UEIK_Subsystem::Login(int32 LocalUserNum, FString ID, FString Token , FString Type, const FBP_Login_Callback& Result)
@@ -40,27 +56,6 @@ void UEIK_Subsystem::Login(int32 LocalUserNum, FString ID, FString Token , FStri
 	{
 		Result.ExecuteIfBound(false,"Failed to get Subsystem");
 	}
-}
-
-bool UEIK_Subsystem::InitializeEIK()
-{
-	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
-	{
-		if(const IOnlineFriendsPtr FriendsPtr = SubsystemRef->GetFriendsInterface())
-		{
-			// Bind the OnSessionUserInviteAccepted event to a delegate
-			OnSessionUserInviteAcceptedDelegate.BindUObject(this, &UEIK_Subsystem::OnSessionUserInviteAccepted);
-
-			// Add the delegate to the online subsystem
-			IOnlineSessionPtr SessionInt = Online::GetSessionInterface(GetWorld());
-			if (SessionInt.IsValid())
-			{
-				SessionInt->AddOnSessionUserInviteAcceptedDelegate_Handle(OnSessionUserInviteAcceptedDelegate);
-			}
-			return true;
-		}
-	}
-	return false;
 }
 
 /*
@@ -142,15 +137,9 @@ FString UEIK_Subsystem::GetPlayerNickname(const int32 LocalUserNum)
 		{
 			return IdentityPointerRef->GetPlayerNickname(LocalUserNum);
 		}
-		else
-		{
-			return FString();
-		}
-	}
-	else
-	{
 		return FString();
 	}
+	return FString();
 }
 
 /*
@@ -300,7 +289,7 @@ void UEIK_Subsystem::FindEOSSession(const FBP_FindSession_Callback& Result, TMap
 			{
 				SessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
 			}
-			if (!Search_Settings.IsEmpty()) {
+			if (Search_Settings.Num()>0) {
 				for (auto& Settings_SingleValue : Search_Settings) {
 					if (Settings_SingleValue.Key.Len() == 0) {
 						continue;
@@ -782,7 +771,7 @@ void UEIK_Subsystem::SetPlayerData(const FBP_WriteFile_Callback& Result, FString
 	{
 		TArray<uint8> LocalArray;
 		UGameplayStatics::SaveGameToMemory(SavedGame,LocalArray);
-		if(!LocalArray.IsEmpty())
+		if(LocalArray.Num() > 0)
 		{
 			if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get() )
 			{
@@ -953,7 +942,12 @@ void UEIK_Subsystem::GetLeaderboard(const FBP_GetFile_Callback& Result, FName Le
 			if(const IOnlineLeaderboardsPtr Leaderboards = SubsystemRef->GetLeaderboardsInterface())
 			{
 				ReadRef = MakeShared<FOnlineLeaderboardRead, ESPMode::ThreadSafe>();
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5
+				FString LeaderboardNameString = LeaderboardName.ToString();
+				ReadRef->LeaderboardName = LeaderboardNameString;
+#else
 				ReadRef->LeaderboardName = LeaderboardName;
+#endif
 				Leaderboards->AddOnLeaderboardReadCompleteDelegate_Handle(FOnLeaderboardReadComplete::FDelegate::CreateUObject(this,&UEIK_Subsystem::OnLeaderboardListCompleted));
 				Leaderboards->ReadLeaderboardsAroundRank(Rank, Range,ReadRef);
 			}
@@ -988,7 +982,6 @@ void UEIK_Subsystem::OnCreateLobbyCompleted(FName SessionName, bool bWasSuccessf
 {
 	if(bWasSuccessful)
 	{
-		FDelegateHandle SessionJoinHandle;
 		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
 		{
 			if(const IOnlineSessionPtr SessionPtrRef = SubsystemRef->GetSessionInterface())
@@ -1184,7 +1177,7 @@ void UEIK_Subsystem::OnGetFileComplete(bool bSuccess, const FUniqueNetId& UserID
 					TSharedPtr<const FUniqueNetId> UserIDRef = IdentityPointerRef->GetUniquePlayerId(0).ToSharedRef();
 					TArray<uint8> FileContents;
 					CloudPointerRef->GetFileContents(*UserIDRef,FileName,FileContents);
-					if(!FileContents.IsEmpty())
+					if(FileContents.Num()>0)
 					{
 						USaveGame* LocalSaveGame = UGameplayStatics::LoadGameFromMemory(FileContents);
 						GetFile_CallbackBP.ExecuteIfBound(true, LocalSaveGame);
@@ -1233,7 +1226,7 @@ void UEIK_Subsystem::OnFriendInviteAcceptedDestroySession(FName Name, bool bArg)
 {
 }
 
-void UEIK_Subsystem::OnSessionUserInviteAccepted(const bool bWasSuccessful, const int32 ControllerId,
+void UEIK_Subsystem::OnSessionUserInviteAccepted12(const bool bWasSuccessful, const int32 ControllerId,
                                                  FUniqueNetIdPtr UserId, const FOnlineSessionSearchResult& InviteResult)
 {
 	if (bWasSuccessful)
@@ -1255,6 +1248,14 @@ void UEIK_Subsystem::OnSessionUserInviteAccepted(const bool bWasSuccessful, cons
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to accept invitation to join session"));
 	} 
+}
+
+void UEIK_Subsystem::FuncEK_OnSessionUserInviteAccepted(bool bArg, int I, TSharedPtr<const FUniqueNetId> UniqueNetId,
+	const FOnlineSessionSearchResult& OnlineSessionSearchResult)
+{
+	FBlueprintSessionResult Result;
+	Result.OnlineResult = OnlineSessionSearchResult;
+	OnSessionUserInviteAccepted.Broadcast(bArg, Result);
 }
 
 //Callback Functions

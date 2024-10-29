@@ -1,4 +1,4 @@
-﻿//Copyright (c) 2023 Betide Studio. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 
 #include "EIK_GetAchievement_AsyncFunction.h"
@@ -20,7 +20,7 @@ void UEIK_GetAchievement_AsyncFunction::Activate()
 
 void UEIK_GetAchievement_AsyncFunction::GetAchievements()
 {
-	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+	if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get("EIK"))
 	{
 		if(const IOnlineAchievementsPtr AchievementsPtrRef = SubsystemRef->GetAchievementsInterface())
 		{
@@ -35,6 +35,11 @@ void UEIK_GetAchievement_AsyncFunction::GetAchievements()
 					OnFail.Broadcast(TArray<FEIK_Achievement>());
 					bDelegateCalled = true;
 					SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+					MarkAsGarbage();
+#else
+					MarkPendingKill();
+#endif
 				}
 			}
 		}
@@ -45,6 +50,11 @@ void UEIK_GetAchievement_AsyncFunction::GetAchievements()
 				OnFail.Broadcast(TArray<FEIK_Achievement>());
 				bDelegateCalled = true;
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 			}
 		}
 	}
@@ -55,6 +65,11 @@ void UEIK_GetAchievement_AsyncFunction::GetAchievements()
 			OnFail.Broadcast(TArray<FEIK_Achievement>());
 			bDelegateCalled = true;
 			SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+			MarkAsGarbage();
+#else
+			MarkPendingKill();
+#endif
 		}
 	}
 }
@@ -63,7 +78,7 @@ void UEIK_GetAchievement_AsyncFunction::OnAchievementsCompleted(const FUniqueNet
 {
 	if(bWasSuccess)
 	{
-		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get())
+		if(const IOnlineSubsystem *SubsystemRef = IOnlineSubsystem::Get("EIK"))
 		{
 			if(const IOnlineAchievementsPtr AchievementsPtrRef = SubsystemRef->GetAchievementsInterface())
 			{
@@ -79,6 +94,11 @@ void UEIK_GetAchievement_AsyncFunction::OnAchievementsCompleted(const FUniqueNet
 				}
 				OnSuccess.Broadcast(AchievementsArray);
 				SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+				MarkAsGarbage();
+#else
+				MarkPendingKill();
+#endif
 				return;
 			}
 		}
@@ -88,5 +108,10 @@ void UEIK_GetAchievement_AsyncFunction::OnAchievementsCompleted(const FUniqueNet
 		OnFail.Broadcast(TArray<FEIK_Achievement>());
 		bDelegateCalled = true;
 		SetReadyToDestroy();
+#if ENGINE_MAJOR_VERSION == 5
+		MarkAsGarbage();
+#else
+		MarkPendingKill();
+#endif
 	}
 }

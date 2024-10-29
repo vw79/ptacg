@@ -9,6 +9,7 @@
 #include "EIKSettings.h"
 #include "eos_anticheatcommon_types.h"
 #include "OnlineSubsystem.h"
+#include "OnlineSubsystemEIK/SdkFunctions/ConnectInterface/EIK_ConnectSubsystem.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "AntiCheatClient.generated.h"
 
@@ -31,6 +32,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "EOS Integration Kit|AntiCheat")
 	bool RecievedMessageFromServer(const TArray<uint8>& Message);
+
+	UFUNCTION(BlueprintCallable, Category = "EOS Integration Kit|AntiCheat", meta = (Keywords = "EOS_AntiCheatClient_EndSession"))
+	bool UnregisterAntiCheatClient();
 	
 	static void EOS_CALL OnMessageToServerCallback(const EOS_AntiCheatClient_OnMessageToServerCallbackInfo* Data);
 
@@ -41,12 +45,11 @@ public:
 	{
 		if(const UEIKSettings* EIKSettings = GetMutableDefault<UEIKSettings>())
 		{
-			if(EIKSettings->bShowAdvancedLogs)
 			{
-				UE_LOG(LogOnline,Warning, TEXT("EIK: %s"), *Log);
+				UE_LOG(LogEIK,Warning, TEXT("EIK: %s"), *Log);
 			}
 		}
 	}
 
-
+	EOS_NotificationId MessageToServerId;
 };
