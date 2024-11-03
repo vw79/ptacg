@@ -76,5 +76,6 @@ DerivedDataCache/*
 # Cementry Asset
 Content/IthrisCemetery/*
 Content/Village/*
+Content/AncientTreasures/*
 Content/Maps/Cementry.umap
 Content/Maps/Radio.umap
