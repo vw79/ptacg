@@ -34,21 +34,22 @@ A cooperative 2-player multiplayer game built in **Unreal Engine**, where one pl
 ![attacker-hud](./Screenshots/AttackerHUD.png)
 
 ### Puzzle Stage (Tomb)  
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="./Screenshots/TombDiggerView.png" alt="Tomb - Digger View" width="90%"><br>
-      <sub><strong>Digger View</strong></sub>
-    </td>
-    <td align="center" width="50%">
-      <img src="./Screenshots/TombAttackerView.png" alt="Tomb - Attacker View" width="90%"><br>
-      <sub><strong>Attacker View</strong></sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="./Screenshots/TombDiggerView.png" alt="Tomb - Digger View" width="70%"><br>
+  <sub><strong>Digger View</strong></sub>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./Screenshots/TombAttackerView.png" alt="Tomb - Attacker View" width="70%"><br>
+  <sub><strong>Attacker View</strong></sub>
+</p>
 
 ### Game Over / Victory
-![end-screen](./Screenshots/GameEnd.png)
+<p align="center">
+  <img src="./Screenshots/GameEnd.png" alt="end-screen" width="70%"><br>
+</p>
 
 ---
 
