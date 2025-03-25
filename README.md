@@ -55,9 +55,16 @@ A cooperative 2-player multiplayer game built in **Unreal Engine**, where one pl
 
 ## 📽️ Videos
 
-### 🎬 Trailer  
-[![Watch the Trailer](https://img.youtube.com/vi/dNazCSZBCHw/0.jpg)](https://www.youtube.com/watch?v=dNazCSZBCHw)
+### 🎬 Trailer
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=dNazCSZBCHw">
+    <img src="https://img.youtube.com/vi/dNazCSZBCHw/0.jpg" width="480"/>
+  </a>
+</p>
 
 ### 🎮 Full Gameplay  
-[![Watch Gameplay](https://img.youtube.com/vi/cr9wV_taeWk/0.jpg)](https://www.youtube.com/watch?v=cr9wV_taeWk)
-
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=cr9wV_taeWk">
+    <img src="https://img.youtube.com/vi/cr9wV_taeWk/0.jpg" width="480"/>
+  </a>
+</p>
